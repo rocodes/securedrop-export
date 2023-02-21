@@ -113,7 +113,7 @@ class Service:
 
         except ExportException as ex:
             logger.error(
-                f"Error encountered during disk format check: {ex.sdstatus.value}"
+                f"Error encountered during export: {ex.sdstatus.value}"
             )
             # Return legacy status values for now for ongoing client compatibility
             if ex.sdstatus in [s for s in Status]:

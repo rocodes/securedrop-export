@@ -349,10 +349,11 @@ class CLI:
 
             subprocess.check_call(["cp", "-r", export_data, target_path])
             logger.info(
-                "File copied successfully to {}".format(submission_target_dirname)
+                "File copied successfully from {} to {}".format(export_data, submission_target_dirname)
             )
 
         except (subprocess.CalledProcessError, OSError) as ex:
+            logger.error(f"Encountered error during export: {ex}")
             raise ExportException(sdstatus=Status.ERROR_EXPORT) from ex
 
         finally:
