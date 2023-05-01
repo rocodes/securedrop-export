@@ -431,61 +431,53 @@ class CLI:
             logger.error("Error removing temporary directory")
             raise ExportException(sdstatus=Status.DEVICE_ERROR) from ex
 
+    def attempt_get_unlocked_veracrypt_volume(self, device: str) -> MountedVolume:
+        """
+        Look for an unlocked VeraCrypt volume in /dev/mapper.
 
-    def _attempt_unlock_veracrypt(self, volume: Volume, encryption_key: str) -> Volume:
+        Raise ExportException on error.
+        """
 
-        # todo check mountpoint
+        # See if there's a volume in /dev/mapper that is already-unlocked TrueCrypt volume
         try:
-            with subprocess.Popen([f"sudo", "cryptsetup", "open", "--type", "tcrypt", "--veracrypt", "{volume.device_name}", "{volume.mountpoint}"],  stdout=subprocess.PIPE, stderr=subprocess.PIPE) as p:
-                p.communicate(input=str.encode(decryption_key, "utf-8"))
-                rc = p.returncode
-
-                if rc == 0:
-                    return Volume(
-                        device_name=volume.device_name,
-                        mapped_name=volume.mapped_name,
-                        encryption=EncryptionScheme.VERACRYPT,
-                    )
-
-                else:
-                    # Something was wrong and we could not unlock.
-                    logger.error("Unlocking failed. Bad passphrase, or unsuitable volume.")
-                    raise ExportException(sdstatus=Status.ERROR_UNLOCK_GENERIC) #  todo
-
-        except subprocess.CalledProcessError as error:
-            # What kind of error message do we have? We may be able to get a little more granular about what the problem is.
-            # But basically, unlocking didn't work.
-            logger.error("Unlocking failed. Bad passphrase, or unsuitable volume.")
-            raise ExportException(sdstatus=Status.ERROR_UNLOCK_GENERIC) #  todo
-
-
-    def attempt_get_veracrypt_volume(self, device: str) -> Volume:
-        # See if there's a volume in /dev/mapper that is a TrueCrypt volume
-        try:
-            ls = subprocess.check_output(["ls", "/dev/mapper/" ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            ls = subprocess.check_output(
+                ["ls", "/dev/mapper/"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
             results = ls.decode().rstrip().split("\n")
 
-            # If something's very wrong, bail
+            # If there are no mapped devices, bail
             if len(results) <= len(self._DEVMAPPER_SYSTEM):
                 raise ExportException(sdstatus=Status.DEVICE_ERROR)
 
             for entry in results:
-                if not entry in self._DEVMAPPER_SYSTEM:
-                    res = subprocess.check_output([f"lsblk", "--noheadings", "-o", "TYPE,MOUNTPOINT", "/dev/mapper/{entry}"])
-                    crypt_type, mountpoint = res.decode().rstrip().split() # Space-separated
-                    if crypt_type == "tcrypt" or crypt_type == "tcrypt-system":
-                        # good news
+                if entry not in self._DEVMAPPER_SYSTEM:
+                    res = subprocess.check_output(
+                        [
+                            "lsblk",
+                            "--noheadings",
+                            "-o",
+                            "NAME,TYPE,MOUNTPOINT",
+                            f"/dev/mapper/{entry}",
+                        ]
+                    )
+                    name, crypt_type, mountpoint = (
+                        res.decode().rstrip().split()
+                    )  # Space-separated
 
-
-
+                    # Notes for our future selves: there is also a `tcrypt-system` identifier.
+                    # It *should* only be used for FDE with TrueCrypt, not for a non-bootable drive.
+                    if crypt_type == "tcrypt" and name == device:
+                        vol = Volume(
+                            device_name=name,
+                            mapped_name=entry,
+                            encryption=EncryptionScheme.VERACRYPT,
+                        )
+                        if mountpoint:
+                            return MountedVolume.from_volume(vol)
+                        else:
+                            return self.mount_volume(vol)
 
         except subprocess.CalledProcessError as e:
-            raise ExportException() # do shtuff
+            logger.error(e)
+            raise ExportException(sdstatus=Status.DEVICE_ERROR)
 
-
-# lsblk TYPE,MOUNTPOINT NOHEADINGS /dev/mapper/xxx
-res = subprocess.check_output([f"lsblk", "--noheadings", "-o", "TYPE,MOUNTPOINT", "/dev/mapper/{item}"])
-crypt_type, mountpoint = res.decode().rstrip().split() # Space-separated
-if crypt_type == "tcrypt" and
-
-# Notes for our future selves: there is a `tcrypt-system` flag, but that *should* only be for FDE with truecrypt, (ie a bootable partition), not this case
