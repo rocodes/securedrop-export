@@ -18,8 +18,8 @@ class Volume:
 
     """
     A volume on a removable device.
-    Volumes have a device name ("/dev/sdX"), a mapped name ("/dev/mapper/xxx"), an encryption
-    scheme, and a mountpoint if they are mounted.
+    A Volume has a device name ("/dev/sdX"), a mapped name ("/dev/mapper/xxx"), an encryption
+    scheme, and a mountpoint if it is mounted.
     """
 
     def __init__(
