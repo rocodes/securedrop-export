@@ -447,7 +447,7 @@ class CLI:
 
             # If there are no mapped devices, bail
             if len(results) <= len(self._DEVMAPPER_SYSTEM):
-                raise ExportException(sdstatus=Status.DEVICE_ERROR)
+                raise ExportException(sdstatus=Status.NO_DEVICE_DETECTED)
 
             for entry in results:
                 if entry not in self._DEVMAPPER_SYSTEM:
@@ -479,5 +479,5 @@ class CLI:
 
         except subprocess.CalledProcessError as e:
             logger.error(e)
-            raise ExportException(sdstatus=Status.DEVICE_ERROR)
+            raise ExportException(sdstatus=Status.INVALID_DEVICE_DETECTED)
 
