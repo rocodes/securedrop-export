@@ -62,15 +62,15 @@ class Service:
                 else:
                     # See if it's an unlocked VeraCrypt volume. Further VeraCrypt support
                     # requires changes to the client, so this is a first step.
-                    try:
-                        # Returns a MountedVolume on success, throws otherwise
-                        if self.cli.attempt_get_unlocked_veracrypt_volume(device):
-                            return LegacyStatus.LEGACY_USB_ENCRYPTED
 
-                    # It's a locked VC/TC drive, or something unsupported
-                    raise ExportException(
-                        sdstatus=LegacyStatus.LEGACY_USB_ENCRYPTION_NOT_SUPPORTED
-                    )
+                    # Returns a MountedVolume on success, throws otherwise
+                    if self.cli.attempt_get_unlocked_veracrypt_volume(device):
+                        return LegacyStatus.LEGACY_USB_ENCRYPTED
+
+                    else:
+                        # Unreachable
+                        raise ExportException()
+
             else:
                 logger.error("Multiple partitions not supported")
                 return LegacyStatus.LEGACY_USB_ENCRYPTION_NOT_SUPPORTED
@@ -124,16 +124,26 @@ class Service:
 
                 else:
                     # Another kind of drive: VeraCrypt/TC, or unsupported.
-                    # For now this is an error--in future there will be support
-                    # for additional encryption formats
-                    logger.error(f"Export failed because {device} is not supported")
-                    raise ExportException(
-                        sdstatus=LegacyStatus.LEGACY_USB_ENCRYPTION_NOT_SUPPORTED
-                    )
+                    mounted_volume = None # Optional[MountedVolume]
+
+                    try:
+                        mounted_volume = self.cli.attempt_get_unlocked_veracrypt_volume(device)
+
+                    except ExportException:
+                        logger.error(f"Export failed, {device} is not supported")
+                        raise
+
+                    if mounted_volume:
+                        logger.info(f"Export submission to {mounted_volume.mountpoint}")
+                        self.cli.write_data_to_device(
+                            self.submission.tmpdir,
+                            self.submission.target_dirname,
+                            mounted_volume,
+                        )   
 
         except ExportException as ex:
             logger.error(
-                f"Error encountered during disk format check: {ex.sdstatus.value}"
+                f"Error encountered during disk export: {ex.sdstatus.value}"
             )
             # Return legacy status values for now for ongoing client compatibility
             if ex.sdstatus in [s for s in Status]:
