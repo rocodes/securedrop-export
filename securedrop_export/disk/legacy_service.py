@@ -53,14 +53,24 @@ class Service:
             if len(all_devices) == 1:
                 device = self.cli.get_partitioned_device(all_devices[0])
                 logger.info("Check if LUKS")
-                if not self.cli.is_luks_volume(device):
+                if self.cli.is_luks_volume(device):
+
+                    # We can support checking if a drive is already unlocked, but for
+                    # backwards compatibility, this is the only expected status
+                    # at this stage
+                    return LegacyStatus.LEGACY_USB_ENCRYPTED
+                else:
+                    # See if it's an unlocked VeraCrypt volume. Further VeraCrypt support
+                    # requires changes to the client, so this is a first step.
+                    try:
+                        # Returns a MountedVolume on success, throws otherwise
+                        if self.cli.attempt_get_unlocked_veracrypt_volume(device):
+                            return LegacyStatus.LEGACY_USB_ENCRYPTED
+
+                    # It's a locked VC/TC drive, or something unsupported
                     raise ExportException(
                         sdstatus=LegacyStatus.LEGACY_USB_ENCRYPTION_NOT_SUPPORTED
                     )
-                # We can support checking if a drive is already unlocked, but for
-                # backwards compatibility, this is the only expected status
-                # at this stage
-                return LegacyStatus.LEGACY_USB_ENCRYPTED
             else:
                 logger.error("Multiple partitions not supported")
                 return LegacyStatus.LEGACY_USB_ENCRYPTION_NOT_SUPPORTED
