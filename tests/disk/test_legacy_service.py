@@ -97,15 +97,22 @@ class TestExportService:
 
         assert ex.value.sdstatus is LegacyStatus.LEGACY_USB_ENCRYPTION_NOT_SUPPORTED
 
-    def test_device_is_not_luks(self):
+    def test_device_is_not_luks_and_not_veracrypt(self):
         self.mock_cli.is_luks_volume.return_value = False
+        self.mock_cli.attempt_get_unlocked_veracrypt_volume.side_effect = ExportException(sdstatus=Status.INVALID_DEVICE_DETECTED)
 
-        # When VeraCrypt is supported, this will no longer be an exception
-        # and the return status will change
-        with pytest.raises(ExportException) as ex:
+        with pytest.raises(ExportException) as result:
             self.service.check_disk_format()
 
-        assert ex.value.sdstatus is LegacyStatus.LEGACY_USB_ENCRYPTION_NOT_SUPPORTED
+        assert result.value.sdstatus == LegacyStatus.LEGACY_USB_ENCRYPTION_NOT_SUPPORTED # CLI._legacy_status(Status.INVALID_DEVICE_DETECTED)
+
+    def test_device_is_unlocked_veracrypt(self):
+        self.mock_cli.is_luks_volume.return_value = False
+
+        # Used to be an exception when only LUKS drives were supported.
+        result = self.service.check_disk_format()
+
+        assert result == LegacyStatus.LEGACY_USB_ENCRYPTED
 
     def test_check_usb_error(self):
         self.mock_cli.get_connected_devices.side_effect = ExportException(
@@ -141,6 +148,7 @@ class TestExportService:
 
     def test_export_disk_not_supported(self):
         self.mock_cli.is_luks_volume.return_value = False
+        self.mock_cli.attempt_get_unlocked_veracrypt_volume.side_effect = ExportException(sdstatus=Status.INVALID_DEVICE_DETECTED)
 
         with pytest.raises(ExportException) as ex:
             self.service.export()
