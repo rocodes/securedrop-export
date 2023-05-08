@@ -480,4 +480,3 @@ class CLI:
         except subprocess.CalledProcessError as e:
             logger.error(e)
             raise ExportException(sdstatus=Status.INVALID_DEVICE_DETECTED)
-

@@ -124,10 +124,12 @@ class Service:
 
                 else:
                     # Another kind of drive: VeraCrypt/TC, or unsupported.
-                    mounted_volume = None # Optional[MountedVolume]
+                    mounted_volume = None  # Optional[MountedVolume]
 
                     try:
-                        mounted_volume = self.cli.attempt_get_unlocked_veracrypt_volume(device)
+                        mounted_volume = self.cli.attempt_get_unlocked_veracrypt_volume(
+                            device
+                        )
 
                     except ExportException:
                         logger.error(f"Export failed, {device} is not supported")
@@ -139,12 +141,10 @@ class Service:
                             self.submission.tmpdir,
                             self.submission.target_dirname,
                             mounted_volume,
-                        )   
+                        )
 
         except ExportException as ex:
-            logger.error(
-                f"Error encountered during disk export: {ex.sdstatus.value}"
-            )
+            logger.error(f"Error encountered during disk export: {ex.sdstatus.value}")
             # Return legacy status values for now for ongoing client compatibility
             if ex.sdstatus in [s for s in Status]:
                 status = self._legacy_status(ex.sdstatus)
