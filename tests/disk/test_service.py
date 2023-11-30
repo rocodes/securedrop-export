@@ -87,31 +87,18 @@ class TestExportService:
 
         assert status == Status.DEVICE_LOCKED
 
-    def test_scan_all_no_devices_connected(self):
-        self.mock_cli.get_all_volumes.return_value = []
-
-        assert self.service.scan_all_devices() == Status.NO_DEVICE_DETECTED
-
-    def test_scan_all_too_many_devices_connected(self):
-        self.mock_cli.get_all_volumes.return_value = [
-            SAMPLE_OUTPUT_USB,
-            "/dev/sdb",
-        ]
-
-        assert self.service.scan_all_devices() == Status.MULTI_DEVICE_DETECTED
-
     def test_scan_all_devices_error(self):
-        self.mock_cli.get_all_volumes.side_effect = ExportException("zounds!")
+        self.mock_cli.get_volume.side_effect = ExportException("zounds!")
 
         assert self.service.scan_all_devices() == Status.DEVICE_ERROR
 
     def test_scan_all_device_is_not_luks_and_unlocked(self):
-        self.mock_cli.get_all_volumes.return_value = [self.mock_vc_volume_mounted]
+        self.mock_cli.get_volume.return_value = self.mock_vc_volume_mounted
 
         assert self.service.scan_all_devices() == Status.DEVICE_WRITABLE
 
     def test_scan_all_device_is_not_luks_and_not_unlocked_error(self):
-        self.mock_cli.get_all_volumes.return_value = [self.mock_vc_volume_unmounted]
+        self.mock_cli.get_volume.return_value = self.mock_vc_volume_unmounted
 
         assert self.service.scan_all_devices() == Status.UNKNOWN_DEVICE_DETECTED
 
