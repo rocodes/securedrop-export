@@ -67,7 +67,6 @@ class TestCli:
         # which matches what would happen if iterating through list of devices
         mocker.patch("subprocess.check_output", side_effect=is_removable)
 
-
     @mock.patch("subprocess.check_call", return_value=0)
     def test_is_luks_volume_true(self, mocked_call):
         # `sudo cryptsetup isLuks` returns 0 if true

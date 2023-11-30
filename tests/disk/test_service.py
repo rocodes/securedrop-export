@@ -76,9 +76,8 @@ class TestExportService:
         errors. `teardown_method()` will reset the side effects so they do not affect subsequent
         test methods.
         """
-        self.mock_cli._get_luks_volume.return_value = self.mock_luks_volume_unmounted
         self.mock_cli.mount_volume.return_value = self.mock_luks_volume_mounted
-        self.mock_cli.get_all_volumes.return_value = [self.mock_luks_volume_unmounted]
+        self.mock_cli.get_volume.return_value = self.mock_luks_volume_unmounted
 
     def teardown_method(self, method):
         self.mock_cli.reset_mock(return_value=True, side_effect=True)
@@ -123,12 +122,12 @@ class TestExportService:
         assert self.service.scan_all_devices() == Status.DEVICE_ERROR
 
     def test_scan_all_device_is_locked_veracrypt_volume(self):
-        self.mock_cli.get_all_volumes.return_value = [self.mock_vc_volume_unmounted]
+        self.mock_cli.get_volume.return_value = self.mock_vc_volume_unmounted
 
         assert self.service.scan_all_devices() == Status.UNKNOWN_DEVICE_DETECTED
 
     def test_export_already_mounted_no_cleanup(self):
-        self.mock_cli.get_all_volumes.return_value = [self.mock_luks_volume_mounted]
+        self.mock_cli.get_volume.return_value = self.mock_luks_volume_mounted
         mock_write = mock.MagicMock()
         self.mock_cli.write_data_to_device = mock_write
         result = self.service.export()
@@ -142,7 +141,7 @@ class TestExportService:
 
     @mock.patch("os.path.exists", return_value=True)
     def test_export_write_error(self, mock_path):
-        self.mock_cli.get_all_volumes.return_value = [self.mock_luks_volume_mounted]
+        self.mock_cli.get_volume.return_value = self.mock_luks_volume_mounted
         self.mock_cli.write_data_to_device.side_effect = ExportException(
             sdstatus=Status.ERROR_EXPORT
         )
