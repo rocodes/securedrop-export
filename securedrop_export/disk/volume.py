@@ -12,6 +12,19 @@ class EncryptionScheme(Enum):
     VERACRYPT = 2
 
 
+class FileSystemType(Enum):
+    """
+    Underlying filesystem groupings.
+    Needed to set dmask/fmask where file system permissions can't be altered.
+    """
+
+    EXT4 = "ext4"
+    VFAT = "vfat"
+    NTFS = "ntfs"
+    OTHER = "other_unspecified"
+    UNKNOWN = "unknown"
+
+
 class Volume:
     MAPPED_VOLUME_PREFIX = "/dev/mapper/"
 
@@ -21,15 +34,19 @@ class Volume:
     name ("/dev/mapper/xxx"), an encryption scheme, and a mountpoint.
     """
 
+    # "name":"vc", "rm":false, "ro":false, "type":"crypt", "mountpoint":"/media/usb", "fstype":"vfat", "fsver":"FAT32"
+
     def __init__(
         self,
         device_name: str,
         mapped_name: str,
         encryption: EncryptionScheme,
+        fstype: FileSystemType = FileSystemType.UNKNOWN,
     ):
         self.device_name = device_name
         self.mapped_name = mapped_name
         self.encryption = encryption
+        self.fstype = fstype
 
     @property
     def encryption(self):
@@ -41,6 +58,14 @@ class Volume:
             self._encryption = scheme
         else:
             self._encryption = EncryptionScheme.UNKNOWN
+
+    @property
+    def fstype(self):
+        return self._fstype
+
+    @fstype.setter
+    def fstype(self, fstype: FileSystemType):
+        self._fstype = fstype
 
     @property
     def unlocked(self) -> bool:
