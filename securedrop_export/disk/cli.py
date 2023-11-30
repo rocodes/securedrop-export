@@ -22,10 +22,6 @@ class CLI:
     sys.exit(0) so that another program does not attempt to open the submission.
     """
 
-    # Default mountpoint (unless drive is already mounted manually by the user)
-    _DEFAULT_MOUNTPOINT = "/media/usb"
-    _DEFAULT_VC_CONTAINER_NAME = "vc-volume"
-
     def get_volume(self) -> Volume:
         """
         See if we have a valid connected device.
@@ -43,8 +39,8 @@ class CLI:
                 item
                 for item in all_devices.get("blockdevices")
                 if item.get("type") == "disk"
-                and item.get("rm") == True
-                and item.get("ro") == False
+                and item.get("rm") is True
+                and item.get("ro") is False
             ]
 
             if len(removable_devices) == 0:
@@ -63,7 +59,7 @@ class CLI:
         except ExportException:
             raise
 
-    def _parse_single_device(self, device: dict) -> Volume:
+    def _parse_single_device(self, block_device: dict) -> Volume:
         """
         Given a JSON-formatted lsblk output for one device, determine if it
         is suitably partitioned and return Volume to be used for export.
@@ -98,7 +94,7 @@ class CLI:
             if len(volumes) != 1:
                 logger.error(f"Need one target on {block_device}, got {len(volumes)}")
                 raise ExportException(sdstatus=Status.INVALID_DEVICE_DETECTED)
-                return volume[0]
+                return volumes[0]
 
         raise ExportException(sdstatus=Status.INVALID_DEVICE_DETECTED)
 
@@ -146,50 +142,6 @@ class CLI:
         else:
             logger.error("Unknown encryption scheme")
             raise ExportException(sdstatus=Status.INVALID_DEVICE_DETECTED)
-
-    def get_all_volumes(self) -> List[Volume]:
-        """
-        Returns a list of all currently-attached removable Volumes that are
-        export device candidates, attempting to get as far towards export process
-        as possible (i.e. probing if device is already unlocked and/or mounted,
-        and mounting it if unlocked but unmounted.)
-
-        Caller must handle ExportException.
-        """
-        volumes = []
-        removable_devices = self._get_connected_devices()
-        try:
-            for item in removable_devices:
-                blkid = self._get_partitioned_device(item)
-                if self.is_luks_volume(blkid):
-                    logger.debug("LUKS volume detected. Checking if unlocked.")
-                    volumes.append(self._get_luks_volume(blkid))
-                else:
-                    try:
-                        logger.debug(
-                            "Not a LUKS volume. Checking if unlocked VeraCrypt."
-                        )
-                        volumes.append(
-                            self._attempt_get_unlocked_veracrypt_volume(blkid)
-                        )
-                    except ExportException:
-                        logger.info("Device is not an unlocked Veracrypt drive.")
-                        volumes.append(
-                            Volume(
-                                device_name=blkid,
-                                encryption=EncryptionScheme.UNKNOWN,
-                                # This will be the name we use if
-                                # trying to unlock the drive.
-                                mapped_name=self._DEFAULT_VC_CONTAINER_NAME,
-                            )
-                        )
-
-            return volumes
-
-        except ExportException as ex:
-            logger.error(f"get_all_volumes failed: {ex.sdstatus.value}")
-            logger.debug(ex)
-            raise
 
     def is_luks_volume(self, device: str) -> bool:
         """
@@ -295,6 +247,22 @@ class CLI:
             logger.debug(error)
             raise ExportException(sdstatus=Status.ERROR_UNLOCK_GENERIC)
 
+    def _get_mountpoint(self, volume: Volume) -> Optional[str]:
+        """
+        Check for existing mountpoint.
+        Raise ExportException if errors encountered during command.
+        """
+        logger.debug("Checking mountpoint")
+        try:
+            output = subprocess.check_output(
+                ["lsblk", "-o", "MOUNTPOINT", "--noheadings", volume.device_name]
+            )
+            return output.decode("utf-8").strip()
+
+        except subprocess.CalledProcessError as ex:
+            logger.error(ex)
+            raise ExportException(sdstatus=Status.ERROR_MOUNT) from ex
+
     def mount_volume(self, volume: Volume) -> MountedVolume:
         """
         Given an unlocked LUKS volume, return MountedVolume object.
@@ -372,9 +340,9 @@ class CLI:
         logger.debug("Syncing filesystems")
         try:
             subprocess.check_call(["sync"])
-            umounted = self._unmount_volume(volume)
+            unmounted = self._unmount_volume(volume)
             if umounted.encryption is EncryptionScheme.LUKS:
-                self._close_luks_volume(umounted)
+                self._close_luks_volume(unmounted)
             elif unmounted.encryption is EncryptionScheme.VERACRYPT:
                 self._close_veracrypt_volume(unmounted)
             self._remove_temp_directory(submission_tmpdir)

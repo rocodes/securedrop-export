@@ -5,7 +5,7 @@ from .status import Status
 from .volume import Volume, MountedVolume, EncryptionScheme
 from securedrop_export.archive import Archive
 from securedrop_export.exceptions import ExportException
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,8 @@ class Service:
         """
         try:
             volume = self.cli.get_volume()
+            if not volume:
+                return Status.NO_DEVICE_DETECTED
 
             if volume.unlocked:
                 return Status.DEVICE_WRITABLE
