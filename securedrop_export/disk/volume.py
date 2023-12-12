@@ -21,6 +21,8 @@ class Volume:
     name ("/dev/mapper/xxx"), an encryption scheme, and a mountpoint.
     """
 
+    # "name":"vc", "rm":false, "ro":false, "type":"crypt", "mountpoint":"/media/usb", "fstype":"vfat", "fsver":"FAT32"
+
     def __init__(
         self,
         device_name: str,
